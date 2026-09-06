@@ -1,0 +1,18 @@
+# GitHub connector — a Hosted MCP integration (ADR-0065 R6, gibson ADR-0014).
+# Hosted points at the vendor's prebuilt MCP image; gibson runs it on ToolHive
+# (MCPServer) behind the ConnectorInstance wrapper. The image is GitHub's own
+# MCP server, run in its streamable-http mode (the binary's `http` subcommand).
+# It reads a GitHub token (a PAT or GitHub App token) from the secret gibson
+# injects, so auth is `secret`, not oauth.
+id: github
+vendor: github
+displayName: GitHub
+description: >-
+  GitHub's official MCP server — repositories, issues, pull requests, code
+  search, and Actions. Run as a Hosted image; authenticates with a GitHub token.
+shape: Hosted
+image: ghcr.io/github/github-mcp-server:v1.10.1
+transport: streamable-http
+egressAllow:
+  - api.github.com:443
+auth: secret

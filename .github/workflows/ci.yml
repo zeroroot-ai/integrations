@@ -1,0 +1,141 @@
+# CI for the first-party Gibson integrations monorepo (ADR-0065).
+#
+# Path-filtered and per-module: a PR that touches plugins/<x>/ or
+# connectors/<x>/ runs only that module's `go test`. Each changed plugin
+# module is additionally built to a container image; connectors are validated
+# by their schema smoke test (the module's `go test`). A fork inherits this
+# file verbatim — no secrets are needed because the Gibson SDK is public.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  # Discover which plugin/connector modules changed, so downstream jobs run
+  # only against them. On a push to main (no diff base) every module runs.
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      modules: ${{ steps.set.outputs.modules }}
+      plugins: ${{ steps.set.outputs.plugins }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - id: set
+        run: |
+          set -uo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+            changed="$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")"
+            pr=1
+          else
+            changed=""
+            pr=0
+          fi
+          mods=""
+          for d in plugins/*/ connectors/*/; do
+            d="${d%/}"
+            [ -f "$d/go.mod" ] || continue
+            if [ "$pr" = "0" ] || printf '%s\n' "$changed" | grep -q "^$d/"; then
+              mods="${mods}${d}"$'\n'
+            fi
+          done
+          list="$(printf '%s' "$mods" | sed '/^$/d')"
+          modules_json="$(printf '%s\n' "$list" | sed '/^$/d' | jq -R . | jq -cs .)"
+          plugins_json="$(printf '%s\n' "$list" | sed '/^$/d' | { grep '^plugins/' || true; } | jq -R . | jq -cs .)"
+          echo "modules=${modules_json}" >> "$GITHUB_OUTPUT"
+          echo "plugins=${plugins_json}" >> "$GITHUB_OUTPUT"
+          echo "changed modules: ${modules_json}"
+          echo "changed plugins: ${plugins_json}"
+
+  # One `go test` per changed module. This is the connector schema-validation
+  # smoke test for connectors and the hermetic cassette test for plugins.
+  test:
+    needs: discover
+    if: needs.discover.outputs.modules != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module: ${{ fromJSON(needs.discover.outputs.modules) }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: stable
+      - name: go test
+        working-directory: ${{ matrix.module }}
+        env:
+          GOTOOLCHAIN: auto
+        run: |
+          go vet ./...
+          go test ./...
+
+  # Build a container image for each changed plugin module (declarative
+  # connectors have no image), and PUBLISH it to ghcr so a cluster can pull it
+  # (ADR-0065 R5: plugin deploy = CI-built image + Helm + GitOps). On a pull
+  # request the image is build-only — nothing is pushed, so a fork PR cannot
+  # publish. On a push to main the image is pushed to
+  # ghcr.io/<repo>/<vendor> under three tags: the plugin.yaml version (the tag
+  # the deploy chart's values pin, e.g. :0.1.0), an immutable :sha-<commit>,
+  # and the moving :latest. A fork inherits this verbatim and publishes to its
+  # OWN ghcr namespace (github.repository is the fork), using the fork's
+  # GITHUB_TOKEN — no cross-org secret is needed.
+  plugin-image:
+    needs: discover
+    if: needs.discover.outputs.plugins != '[]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        plugin: ${{ fromJSON(needs.discover.outputs.plugins) }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      # image = ghcr.io/<repo>/<vendor>, lowercased (ghcr rejects upper-case
+      # path segments; github.repository can carry them). version comes from
+      # the plugin's own manifest so the published tag matches what the deploy
+      # chart's values pin.
+      - id: meta
+        run: |
+          set -euo pipefail
+          vendor="$(basename '${{ matrix.plugin }}')"
+          image="$(printf 'ghcr.io/%s/%s' '${{ github.repository }}' "$vendor" | tr '[:upper:]' '[:lower:]')"
+          version="$(yq -r '.metadata.version' '${{ matrix.plugin }}/plugin.yaml')"
+          if [ -z "$version" ] || [ "$version" = "null" ]; then
+            echo "::error::${{ matrix.plugin }}/plugin.yaml has no metadata.version"; exit 1
+          fi
+          echo "image=$image"     >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "sha=sha-${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      # Publish only on a push to main; PRs (including fork PRs) build without
+      # credentials and never push.
+      - name: log in to ghcr
+        if: github.event_name == 'push'
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: build and push
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: ${{ matrix.plugin }}
+          push: ${{ github.event_name == 'push' }}
+          tags: |
+            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }}
+            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.sha }}
+            ${{ steps.meta.outputs.image }}:latest

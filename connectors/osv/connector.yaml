@@ -1,0 +1,15 @@
+# OSV connector — a Hosted MCP integration (ADR-0065 R6, gibson ADR-0014).
+# Hosted points at the vendor's prebuilt MCP image; gibson runs it on ToolHive
+# (MCPServer) behind the ConnectorInstance wrapper. No vendor credential.
+id: osv
+vendor: osv
+displayName: OSV
+description: >-
+  Open Source Vulnerabilities lookup — query CVEs and advisories for packages
+  and commits. Needs no vendor credential.
+shape: Hosted
+image: ghcr.io/stackloklabs/osv-mcp/server
+transport: streamable-http
+egressAllow:
+  - api.osv.dev:443
+auth: none

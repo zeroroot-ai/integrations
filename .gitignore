@@ -1,0 +1,5 @@
+# Compiled plugin binaries are named after the module; keep source only.
+/plugins/*/dist/
+# Editor / OS noise
+.DS_Store
+*.swp

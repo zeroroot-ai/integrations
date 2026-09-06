@@ -1,0 +1,9 @@
+apiVersion: component.gibson.zeroroot.ai/v1
+kind: plugin
+metadata:
+  name: github
+  version: 0.1.0
+  description: "GitHub plugin — curated read/write over the GitHub REST API."
+spec:
+  runtime: process
+  manifest_path: ./plugin.yaml

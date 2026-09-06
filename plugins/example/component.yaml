@@ -1,0 +1,9 @@
+apiVersion: component.gibson.zeroroot.ai/v1
+kind: plugin
+metadata:
+  name: example
+  version: 0.1.0
+  description: "example plugin"
+spec:
+  runtime: process
+  manifest_path: ./plugin.yaml
