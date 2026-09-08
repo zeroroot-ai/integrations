@@ -18,6 +18,11 @@ permissions:
 jobs:
   # Discover which plugin/connector modules changed, so downstream jobs run
   # only against them. On a push to main (no diff base) every module runs.
+  #
+  # A pull request that changes the root Makefile or this workflow changes what
+  # runs for EVERY module, so it puts every module in scope. Without that rule
+  # such a pull request selects no module, every downstream job skips, and the
+  # change to the gate merges untested.
   discover:
     runs-on: ubuntu-latest
     outputs:
@@ -34,6 +39,10 @@ jobs:
             git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
             changed="$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")"
             pr=1
+            if printf '%s\n' "$changed" | grep -qxE 'Makefile|\.github/workflows/ci\.yml'; then
+              echo "root Makefile or ci.yml changed: every module is in scope"
+              pr=0
+            fi
           else
             changed=""
             pr=0
@@ -54,8 +63,10 @@ jobs:
           echo "changed modules: ${modules_json}"
           echo "changed plugins: ${plugins_json}"
 
-  # One `go test` per changed module. This is the connector schema-validation
-  # smoke test for connectors and the hermetic cassette test for plugins.
+  # Build, vet and test each changed module. This is the connector
+  # schema-validation smoke test for connectors and the hermetic cassette test
+  # for plugins. The commands live in the root Makefile (`build`, `check`,
+  # `test`), so the gate and a local run cannot drift apart.
   test:
     needs: discover
     if: needs.discover.outputs.modules != '[]'
@@ -69,13 +80,10 @@ jobs:
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: stable
-      - name: go test
-        working-directory: ${{ matrix.module }}
-        env:
-          GOTOOLCHAIN: auto
-        run: |
-          go vet ./...
-          go test ./...
+      # The Makefile exports GOTOOLCHAIN=auto, so each module fetches the Go
+      # version its go.mod pins.
+      - name: make build check test
+        run: make build check test MODULES=${{ matrix.module }}
 
   # Build a container image for each changed plugin module (declarative
   # connectors have no image), and PUBLISH it to ghcr so a cluster can pull it
