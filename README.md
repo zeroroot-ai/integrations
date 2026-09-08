@@ -56,9 +56,25 @@ repo's CI — long before Gibson loads it. See `connectors/osv/`.
 ## CI
 
 `.github/workflows/ci.yml` is path-filtered and per-module: a PR touching
-`plugins/<x>/` or `connectors/<x>/` runs only that module's `go vet` + `go test`,
-and builds a container image for each changed plugin. A push to `main` runs
-every module. No secrets are needed — the Gibson SDK is public.
+`plugins/<x>/` or `connectors/<x>/` runs only that module, and builds a
+container image for each changed plugin. A push to `main` runs every module. No
+secrets are needed, because the Gibson SDK is public.
+
+CI calls the root `Makefile`, so one command set serves the gate and your
+workstation:
+
+| Target | What it runs |
+|--------|--------------|
+| `make build` | `go build ./...` in every module |
+| `make test` | `go test ./...` in every module |
+| `make check` | `go vet ./...` in every module |
+
+Pass `MODULES=` to narrow the loop, the way CI narrows it to the modules a pull
+request changed:
+
+```sh
+make test MODULES=plugins/github
+```
 
 ## Licensing
 

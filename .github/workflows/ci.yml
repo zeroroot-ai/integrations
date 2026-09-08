@@ -54,8 +54,10 @@ jobs:
           echo "changed modules: ${modules_json}"
           echo "changed plugins: ${plugins_json}"
 
-  # One `go test` per changed module. This is the connector schema-validation
-  # smoke test for connectors and the hermetic cassette test for plugins.
+  # Build, vet and test each changed module. This is the connector
+  # schema-validation smoke test for connectors and the hermetic cassette test
+  # for plugins. The commands live in the root Makefile (`build`, `check`,
+  # `test`), so the gate and a local run cannot drift apart.
   test:
     needs: discover
     if: needs.discover.outputs.modules != '[]'
@@ -69,13 +71,10 @@ jobs:
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: stable
-      - name: go test
-        working-directory: ${{ matrix.module }}
-        env:
-          GOTOOLCHAIN: auto
-        run: |
-          go vet ./...
-          go test ./...
+      # The Makefile exports GOTOOLCHAIN=auto, so each module fetches the Go
+      # version its go.mod pins.
+      - name: make build check test
+        run: make build check test MODULES=${{ matrix.module }}
 
   # Build a container image for each changed plugin module (declarative
   # connectors have no image), and PUBLISH it to ghcr so a cluster can pull it
