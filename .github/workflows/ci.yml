@@ -18,6 +18,11 @@ permissions:
 jobs:
   # Discover which plugin/connector modules changed, so downstream jobs run
   # only against them. On a push to main (no diff base) every module runs.
+  #
+  # A pull request that changes the root Makefile or this workflow changes what
+  # runs for EVERY module, so it puts every module in scope. Without that rule
+  # such a pull request selects no module, every downstream job skips, and the
+  # change to the gate merges untested.
   discover:
     runs-on: ubuntu-latest
     outputs:
@@ -34,6 +39,10 @@ jobs:
             git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
             changed="$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")"
             pr=1
+            if printf '%s\n' "$changed" | grep -qxE 'Makefile|\.github/workflows/ci\.yml'; then
+              echo "root Makefile or ci.yml changed: every module is in scope"
+              pr=0
+            fi
           else
             changed=""
             pr=0
