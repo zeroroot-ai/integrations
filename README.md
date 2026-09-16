@@ -3,6 +3,11 @@
 First-party connectors and plugins for [Gibson](https://github.com/zeroroot-ai),
 built on the public [Gibson SDK](https://github.com/zeroroot-ai/sdk) (ADR-0065).
 
+**License: Elastic License 2.0.** It is source-available, not open source. See
+[LICENSE](LICENSE). GitHub reports this repository as `NOASSERTION` because its
+detector does not recognize ELv2, so the sidebar says nothing. This line is the
+statement. The terms are in [Licensing](#licensing) below.
+
 Every integration is a single directory: self-contained, individually testable,
 and authorable by an AI coding agent in about ten minutes. This repo is the
 worked reference for both integration lanes — a fork inherits the layout and the
@@ -79,12 +84,14 @@ make test MODULES=plugins/github
 ## Licensing
 
 The contents of this repo are licensed under the **Elastic License 2.0** (see
-`LICENSE`): read, download, run and modify, but not offer to third parties as a
-hosted or managed service. The Gibson SDK they build on stays Apache-2.0, so
-what you write against the SDK is unaffected by this repo's terms.
+[LICENSE](LICENSE)). Zero Root AI is the licensor. You may read, download, run
+and modify the contents, but not offer them to third parties as a hosted or
+managed service. ELv2 is source-available, not open source, and it is not
+OSI-approved.
 
-## License and history
+The Gibson SDK they build on stays Apache-2.0, so what you write against the
+SDK is unaffected by this repo's terms.
 
-Elastic License 2.0. See [LICENSE](LICENSE). Zero Root AI is the licensor.
+## History
 
 Issue and pull request numbers cited in comments and documents dated before 2026-09-05 refer to the tracker before the history reset, archived offline. They do not resolve on GitHub.
