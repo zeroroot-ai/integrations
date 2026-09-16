@@ -22,6 +22,7 @@ register:
 run: build
 	gibson component run
 
-## image: build the container image.
+## image: build the container image. The build context is the repository
+## root, because LICENSE lives there and the image has to carry it.
 image:
-	docker build -t $(BINARY):0.1.0 .
+	cd ../.. && docker build -f plugins/github/Dockerfile -t $(BINARY):0.1.0 .

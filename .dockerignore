@@ -1,0 +1,6 @@
+# The build context for every plugin image is the REPOSITORY ROOT, not the
+# plugin directory, because LICENSE lives at the root and each image has to
+# carry it. That sends the whole worktree to the builder, so keep the git
+# database out of it. Each Dockerfile copies only its own plugins/<vendor>/
+# subtree, so nothing else needs excluding.
+.git
