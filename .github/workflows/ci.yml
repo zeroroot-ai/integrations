@@ -33,11 +33,18 @@ jobs:
         with:
           fetch-depth: 0
       - id: set
+        # Everything from the event reaches the script as an environment
+        # variable. github.base_ref is a branch name a PR author chooses, and
+        # it used to be interpolated straight into this run: block.
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          REPO: ${{ github.repository }}
         run: |
           set -uo pipefail
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
-            changed="$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")"
+          if [ "$EVENT" = "pull_request" ]; then
+            git fetch --no-tags --depth=1 origin "$BASE_REF"
+            changed="$(git diff --name-only "origin/${BASE_REF}...HEAD")"
             pr=1
             if printf '%s\n' "$changed" | grep -qxE 'Makefile|\.github/workflows/ci\.yml'; then
               echo "root Makefile or ci.yml changed: every module is in scope"
@@ -57,16 +64,29 @@ jobs:
           done
           list="$(printf '%s' "$mods" | sed '/^$/d')"
           modules_json="$(printf '%s\n' "$list" | sed '/^$/d' | jq -R . | jq -cs .)"
-          plugins_json="$(printf '%s\n' "$list" | sed '/^$/d' | { grep '^plugins/' || true; } | jq -R . | jq -cs .)"
+          # plugins is an INCLUDE MATRIX: one object per plugin with the image
+          # name and the plugin.yaml version. The image job calls the shared
+          # build, which is a reusable workflow, and a job that `uses:` one
+          # cannot run a step first — so the lookup that used to live in that
+          # job's `meta` step lives here.
+          plugins_json="$(printf '%s\n' "$list" | sed '/^$/d' | { grep '^plugins/' || true; } | while IFS= read -r p; do
+              [ -n "$p" ] || continue
+              vendor="$(basename "$p")"
+              image="$(printf 'ghcr.io/%s/%s' "$REPO" "$vendor" | tr '[:upper:]' '[:lower:]')"
+              version="$(yq -r '.metadata.version // ""' "$p/plugin.yaml")"
+              jq -cn --arg plugin "$p" --arg vendor "$vendor" --arg image "$image" --arg version "$version" \
+                '{plugin:$plugin, vendor:$vendor, image:$image, version:$version}'
+            done | jq -cs .)"
+          # A plugin with no metadata.version cannot be tagged, and a pipeline
+          # cannot fail the step from inside its subshell — so check the result.
+          if printf '%s' "$plugins_json" | jq -e 'map(select(.version == "" or .version == "null")) | length > 0' >/dev/null; then
+            printf '%s' "$plugins_json" | jq -r '.[] | select(.version == "" or .version == "null") | "::error::\(.plugin)/plugin.yaml has no metadata.version"'
+            exit 1
+          fi
           echo "modules=${modules_json}" >> "$GITHUB_OUTPUT"
           echo "plugins=${plugins_json}" >> "$GITHUB_OUTPUT"
           echo "changed modules: ${modules_json}"
           echo "changed plugins: ${plugins_json}"
-
-  # Build, vet and test each changed module. This is the connector
-  # schema-validation smoke test for connectors and the hermetic cassette test
-  # for plugins. The commands live in the root Makefile (`build`, `check`,
-  # `test`), so the gate and a local run cannot drift apart.
   test:
     needs: discover
     if: needs.discover.outputs.modules != '[]'
@@ -83,7 +103,9 @@ jobs:
       # The Makefile exports GOTOOLCHAIN=auto, so each module fetches the Go
       # version its go.mod pins.
       - name: make build check test
-        run: make build check test MODULES=${{ matrix.module }}
+        env:
+          MODULE: ${{ matrix.module }}
+        run: make build check test MODULES="$MODULE"
 
   # Build a container image for each changed plugin module (declarative
   # connectors have no image), and PUBLISH it to ghcr so a cluster can pull it
@@ -98,73 +120,35 @@ jobs:
   plugin-image:
     needs: discover
     if: needs.discover.outputs.plugins != '[]'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
     strategy:
       fail-fast: false
       matrix:
-        plugin: ${{ fromJSON(needs.discover.outputs.plugins) }}
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
-      # image = ghcr.io/<repo>/<vendor>, lowercased (ghcr rejects upper-case
-      # path segments; github.repository can carry them). version comes from
-      # the plugin's own manifest so the published tag matches what the deploy
-      # chart's values pin.
-      - id: meta
-        run: |
-          set -euo pipefail
-          vendor="$(basename '${{ matrix.plugin }}')"
-          image="$(printf 'ghcr.io/%s/%s' '${{ github.repository }}' "$vendor" | tr '[:upper:]' '[:lower:]')"
-          version="$(yq -r '.metadata.version' '${{ matrix.plugin }}/plugin.yaml')"
-          if [ -z "$version" ] || [ "$version" = "null" ]; then
-            echo "::error::${{ matrix.plugin }}/plugin.yaml has no metadata.version"; exit 1
-          fi
-          echo "vendor=$vendor"   >> "$GITHUB_OUTPUT"
-          echo "image=$image"     >> "$GITHUB_OUTPUT"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "sha=sha-${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
-
-      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
-
-      # Publish only on a push to main; PRs (including fork PRs) build without
-      # credentials and never push.
-      - name: log in to ghcr
-        if: github.event_name == 'push'
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      # The GitHub API answers NOASSERTION for any license it does not
-      # recognize as OSI, and Elastic License 2.0 is not one, so a scanner
-      # reads every image we publish as "unlicensed". The org action
-      # classifies the LICENSE text instead. This job has no
-      # docker/metadata-action step, so the label goes straight to
-      # build-push-action (.github#80).
-      - id: license
-        uses: zeroroot-ai/.github/actions/spdx-from-license@625c0b92ef329bfe40f11f639ee6136c8706538b # main, 2026-09-16
-
-      - name: build and push
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
-        with:
-          # The REPOSITORY ROOT, not the plugin directory. The image has to
-          # carry its license text, LICENSE lives at the root, and Docker
-          # cannot read a file outside the context. Copying LICENSE into each
-          # plugin directory would make a second source of truth that drifts.
-          # Each plugin's Dockerfile copies only its own plugins/<vendor>/
-          # subtree, so the wider context changes nothing else.
-          context: .
-          file: ${{ matrix.plugin }}/Dockerfile
-          push: ${{ github.event_name == 'push' }}
-          labels: |
-            org.opencontainers.image.licenses=${{ steps.license.outputs.spdx }}
-            org.opencontainers.image.title=${{ steps.meta.outputs.vendor }}
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-          tags: |
-            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }}
-            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.sha }}
-            ${{ steps.meta.outputs.image }}:latest
+        include: ${{ fromJSON(needs.discover.outputs.plugins) }}
+    # THE SHARED BUILD (.github#81). This job used to call
+    # docker/build-push-action itself, with a hand-rolled licence label and
+    # three hand-written tags — and no SBOM, no cosign attestation, no SLSA
+    # provenance, no Trivy scan before the push, and no verification that the
+    # image actually shipped its licence text. A fix landed in the shared
+    # workflow reached every other repo and not this one.
+    #
+    # Tag shape, before -> after: `:<version>` stays (version_tag);
+    # `:sha-<12>` becomes the shared `:sha-<7>`; `:latest` stays, on push to
+    # main. Nothing in the estate pins a plugin image by the 12-char form.
+    uses: zeroroot-ai/.github/.github/workflows/reusable-image-build.yml@3d1a2b1266f47a68e410988bed7a63efa9dce12b # main, 2026-09-16: pin this repo's own actions to v0.2.0 (.github#88)
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+      security-events: write
+      actions: read
+    with:
+      component_name: ${{ matrix.vendor }}
+      # The REPOSITORY ROOT, not the plugin directory: the image has to carry
+      # its licence text, LICENSE lives at the root, and Docker cannot read a
+      # file outside the context. Each Dockerfile copies only its own subtree.
+      component_path: .
+      dockerfile_path: ${{ matrix.plugin }}/Dockerfile
+      image_name: ${{ matrix.image }}
+      tag_pattern: ${{ matrix.vendor }}/v(.*)
+      version_tag: ${{ matrix.version }}
