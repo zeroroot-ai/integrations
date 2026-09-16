@@ -36,6 +36,9 @@ make run
 
 ## Container (pod runtime mode)
 
+The build context is the repository root, because `LICENSE` lives there and the
+image has to carry it. Run this from the repository root:
+
 ```sh
-docker build -t example:0.1.0 .
+docker build -f plugins/example/Dockerfile -t example:0.1.0 .
 ```
