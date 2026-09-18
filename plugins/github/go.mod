@@ -1,10 +1,10 @@
 module github.com/zeroroot-ai/integrations/plugins/github
 
-go 1.26.4
+go 1.26.8
 
 require (
 	github.com/google/go-github/v90 v90.0.0
-	github.com/zeroroot-ai/sdk v0.171.0
+	github.com/zeroroot-ai/sdk v0.179.0
 )
 
 require (
@@ -22,7 +22,7 @@ require (
 	golang.org/x/text v0.41.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260610212136-7ab31c22f7ad // indirect
 	google.golang.org/grpc v1.83.2 // indirect
-	google.golang.org/protobuf v1.36.11 // indirect
+	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

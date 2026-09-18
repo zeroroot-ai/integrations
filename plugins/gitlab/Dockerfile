@@ -8,7 +8,7 @@
 # The root is the context because LICENSE lives there and the image has to
 # carry it. Copying LICENSE into each plugin directory instead would make a
 # second source of truth that drifts.
-FROM golang:1.26.4-alpine@sha256:3ad57304ad93bbec8548a0437ad9e06a455660655d9af011d58b993f6f615648 AS builder
+FROM golang:1.26.8-alpine@sha256:51a7c389a5ddaf82f527191a1e9bff9928655130a44e4975dd1d7e0acf59f1ae AS builder
 
 WORKDIR /build
 COPY plugins/gitlab/go.mod plugins/gitlab/go.sum* ./
