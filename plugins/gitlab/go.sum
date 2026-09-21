@@ -63,8 +63,8 @@ github.com/spiffe/go-spiffe/v2 v2.8.1 h1:eXZMLsu+3MLEPJyGJkolqtVrteZfQdUpOWj6LTi
 github.com/spiffe/go-spiffe/v2 v2.8.1/go.mod h1:47Q0Q9/AqGha8QLHp+kxpH4Wca7X7EnOtlIJy3mxZ3U=
 github.com/stretchr/testify v1.12.1 h1:EuwCh5fleGS7H32xRwO3wRGT7DxrDhLAT6FF8MpWDWE=
 github.com/stretchr/testify v1.12.1/go.mod h1:MDEgiDPPsNp5cuIrHPPCyornHKgEVbtFUmoNlxoYthg=
-github.com/zeroroot-ai/sdk v0.179.0 h1:mDKS8y6gb6GUUHm8e5jv1FK5SOVUO0n+WP4+5jYbJh0=
-github.com/zeroroot-ai/sdk v0.179.0/go.mod h1:R7Rpj9xGZF23Fe+ZXyDxudQz/2SYg4KCfif50a1e0T8=
+github.com/zeroroot-ai/sdk v0.179.1 h1:Lr9Grso0orhEDK8TiuMB+fBIM46aeRZZ6Gi9cxPRXe4=
+github.com/zeroroot-ai/sdk v0.179.1/go.mod h1:R7Rpj9xGZF23Fe+ZXyDxudQz/2SYg4KCfif50a1e0T8=
 gitlab.com/gitlab-org/api/client-go v1.46.0 h1:YxBWFZIFYKcGESCb9fpkwzouo+apyB9pr/XTWzNoL24=
 gitlab.com/gitlab-org/api/client-go v1.46.0/go.mod h1:FtgyU6g2HS5+fMhw6nLK96GBEEBx5MzntOiJWfIaiN8=
 go.opentelemetry.io/auto/sdk v1.2.1 h1:jXsnJ4Lmnqd11kwkBV2LgLoFMZKizbCi5fNZ/ipaZ64=

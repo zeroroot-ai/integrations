@@ -3,7 +3,7 @@ module github.com/zeroroot-ai/integrations/plugins/gitlab
 go 1.26.8
 
 require (
-	github.com/zeroroot-ai/sdk v0.179.0
+	github.com/zeroroot-ai/sdk v0.179.1
 	gitlab.com/gitlab-org/api/client-go v1.46.0
 )
 
