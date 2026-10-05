@@ -1,4 +1,4 @@
-# OSV connector — a Hosted MCP integration (ADR-0065 R6, gibson ADR-0014).
+# OSV connector — a Hosted MCP integration (ADR-0065 R6, ADR-0114).
 # Hosted points at the vendor's prebuilt MCP image; gibson runs it on ToolHive
 # (MCPServer) behind the ConnectorInstance wrapper. No vendor credential.
 id: osv

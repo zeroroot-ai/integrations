@@ -1,4 +1,4 @@
-# GitLab connector — a Remote MCP integration (ADR-0065 R6, gibson ADR-0014).
+# GitLab connector — a Remote MCP integration (ADR-0065 R6, ADR-0114).
 # Remote points at a vendor-hosted MCP endpoint that gibson proxies through the
 # connector-operator; there is no image to run. GitLab hosts an MCP server at
 # its REST API root and negotiates OAuth with the `mcp` scope.
