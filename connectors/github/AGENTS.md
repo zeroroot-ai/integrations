@@ -9,7 +9,7 @@ same path.
 ## The manifest schema
 
 `connector.yaml` fields (mirrors gibson's
-`internal/platform/connectorcatalog`):
+`internal/platform/componentcatalog`):
 
 - `id` — stable catalog id and tool namespace (`mcp:<id>:<tool>`). Required.
 - `vendor` — the vendor this integrates. Metadata, not the key.

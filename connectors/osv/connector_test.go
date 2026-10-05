@@ -11,7 +11,7 @@ import (
 )
 
 // entry mirrors the fields gibson's connector catalog parses from a manifest
-// (internal/platform/connectorcatalog, ADR-0065 R6). It is declared locally so
+// (internal/platform/componentcatalog, ADR-0065 R6). It is declared locally so
 // this smoke test stays hermetic and never imports gibson — the integrations
 // repo must not depend on the platform.
 type entry struct {
